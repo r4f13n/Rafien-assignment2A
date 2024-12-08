@@ -7,7 +7,7 @@ Author: "Rafien Mohammed"
 Semester: "Fall 2024"
 
 The python code in this file is original work written by
-"Student Name". No code in this file is copied from any other source 
+"Rafien Mohammed". No code in this file is copied from any other source 
 except those provided by the course instructor, including any person, 
 textbook, or on-line resource. I have not shared this python script 
 with anyone or anything except for submission for grading.  
@@ -45,8 +45,7 @@ def get_sys_mem() -> int:
     with open("/proc/meminfo", "r") as f:
         for line in f:
             if line.startswith("MemTotal"):
-                # Extract the value of MemTotal
-                return int(line.split()[1])
+                return int(line.split()[1]) # Extracts the value of MemTotal
     return 0
 
 def get_avail_mem() -> int:
@@ -54,17 +53,26 @@ def get_avail_mem() -> int:
     with open("/proc/meminfo", "r") as f:
         for line in f:
             if line.startswith("MemAvailable"):
-                # Extract the value of MemAvailable
-                return int(line.split()[1])
+                return int(line.split()[1]) # Extracts the value of MemAvailable
     return 0
 
 def pids_of_prog(app_name: str) -> list:
     "given an app name, return all pids associated with app"
-    ...
+    pids = os.popen(f'pidof {app_name}').read().strip().split()
+    return pids if pids else []
 
 def rss_mem_of_pid(proc_id: str) -> int:
     "given a process id, return the resident memory used, zero if not found"
-    ...
+    rss_mem = 0
+    try:
+        with open(f'/proc/{proc_id}/smaps', 'r') as f:
+            for line in f:
+                if 'Rss:' in line:
+                    rss_mem += int(line.split()[1])
+    except FileNotFoundError:
+        pass
+    return rss_mem
+
 
 def bytes_to_human_r(kibibytes: int, decimal_places: int=2) -> str:
     "turn 1,024 into 1 MiB, for example"
@@ -81,9 +89,27 @@ def bytes_to_human_r(kibibytes: int, decimal_places: int=2) -> str:
 if __name__ == "__main__":
     args = parse_command_args()
     if not args.program:
-        ...
+        total_mem = get_sys_mem()
+        avail_mem = get_avail_mem()
+        used_mem = total_mem - avail_mem
+        used_percent = used_mem / total_mem
+        graph = percent_to_graph(used_percent, args.length)
+        if args.human_readable:
+            total_mem = bytes_to_human_r(total_mem)
+            used_mem = bytes_to_human_r(used_mem)
+        print(f"Memory {graph} {int(used_percent * 100)}% {used_mem}/{total_mem}")
     else:
-        ...
+        pids = pids_of_prog(args.program)
+        if not pids:
+            print(f"{args.program} not found.")
+            sys.exit()
+        for pid in pids:
+            rss = rss_mem_of_pid(pid)
+            rss_percent = rss / get_sys_mem()
+            graph = percent_to_graph(rss_percent, args.length)
+            if args.human_readable:
+                rss = bytes_to_human_r(rss)
+            print(f"{pid:6} {graph} {rss}")
     # process args
     # if no parameter passed, 
     # open meminfo.
